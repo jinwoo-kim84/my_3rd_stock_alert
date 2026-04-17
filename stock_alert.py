@@ -18,7 +18,7 @@ STOCKS = {
     '456160': '지투지바이오'
 }
 
-STEP = 3.0  # 3% 단위로 알림
+STEP = 0.1  # 테스트용 (원래 3.0)
 
 def get_stock_price(code):
     """네이버 금융에서 현재가 가져오기"""
@@ -67,9 +67,7 @@ def save_last_alerts(alerts):
         print(f"기록 저장 실패: {e}")
 
 def get_level(change):
-    """등락률을 3% 단위 레벨로 변환
-    예: +3.5% → 1, +6.2% → 2, -3.8% → -1, -7.1% → -2
-    """
+    """등락률을 STEP 단위 레벨로 변환"""
     if abs(change) < STEP:
         return 0
     if change > 0:
@@ -91,15 +89,11 @@ def main():
         print(f"{name}: {price:,}원 ({change:+.2f}%, 레벨 {current_level})")
         
         if current_level == 0:
-            continue  # 3% 미만 변동은 무시
+            continue
         
-        # 오늘 이 종목이 최대 어느 레벨까지 알림 보냈는지 확인
         key = f"{today}_{code}"
         last_level = last_alerts.get(key, 0)
         
-        # 새로운 레벨에 도달했을 때만 알림
-        # 예: 이전 레벨 1 (+3%대) → 현재 레벨 2 (+6%대) 진입 시 알림
-        #     이전 레벨 -1 (-3%대) → 현재 레벨 -2 (-6%대) 진입 시 알림
         should_alert = False
         if current_level > 0 and current_level > last_level:
             should_alert = True
@@ -108,7 +102,7 @@ def main():
         
         if should_alert:
             emoji = '🚀' if change > 0 else '📉'
-            threshold_text = f"{current_level * STEP:+.0f}% 돌파"
+            threshold_text = f"{current_level * STEP:+.1f}% 돌파"
             message = (
                 f"{emoji} <b>{name}</b> {threshold_text}\n"
                 f"등락률: {change:+.2f}%\n"
@@ -119,7 +113,6 @@ def main():
                 last_alerts[key] = current_level
                 print(f"알림 전송 완료: {name} 레벨 {current_level}")
     
-    # 7일 이전 기록은 삭제
     cutoff = datetime.now().strftime('%Y-%m-%d')
     last_alerts = {k: v for k, v in last_alerts.items() if k.split('_')[0] >= cutoff}
     save_last_alerts(last_alerts)

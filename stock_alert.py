@@ -18,7 +18,7 @@ STOCKS = {
     '456160': '지투지바이오'
 }
 
-THRESHOLD = 0.1  # ±3% 변동 감지
+STEP = 3.0  # 3% 단위로 알림
 
 def get_stock_price(code):
     """네이버 금융에서 현재가 가져오기"""
@@ -46,7 +46,7 @@ def send_telegram(message):
         return False
 
 def load_last_alerts():
-    """이전 알림 기록 불러오기 (중복 알림 방지용)"""
+    """이전 알림 기록 불러오기"""
     url = f"https://api.github.com/gists/{GIST_ID}"
     headers = {'Authorization': f'token {GIST_TOKEN}'}
     try:
@@ -66,6 +66,17 @@ def save_last_alerts(alerts):
     except Exception as e:
         print(f"기록 저장 실패: {e}")
 
+def get_level(change):
+    """등락률을 3% 단위 레벨로 변환
+    예: +3.5% → 1, +6.2% → 2, -3.8% → -1, -7.1% → -2
+    """
+    if abs(change) < STEP:
+        return 0
+    if change > 0:
+        return int(change // STEP)
+    else:
+        return -int(abs(change) // STEP)
+
 def main():
     print(f"=== 실행 시간: {datetime.now()} ===")
     last_alerts = load_last_alerts()
@@ -76,22 +87,37 @@ def main():
         if price is None:
             continue
         
-        print(f"{name}: {price:,}원 ({change:+.2f}%)")
+        current_level = get_level(change)
+        print(f"{name}: {price:,}원 ({change:+.2f}%, 레벨 {current_level})")
         
-        # ±3% 이상 변동 시 알림
-        if abs(change) >= THRESHOLD:
-            # 오늘 이미 같은 방향으로 알림 보냈는지 확인
-            key = f"{today}_{code}_{'up' if change > 0 else 'down'}"
-            if key not in last_alerts:
-                emoji = '🚀' if change > 0 else '📉'
-                message = (
-                    f"{emoji} <b>{name}</b> {change:+.2f}%\n"
-                    f"현재가: {price:,}원\n"
-                    f"시각: {datetime.now().strftime('%H:%M')}"
-                )
-                if send_telegram(message):
-                    last_alerts[key] = True
-                    print(f"알림 전송 완료: {name}")
+        if current_level == 0:
+            continue  # 3% 미만 변동은 무시
+        
+        # 오늘 이 종목이 최대 어느 레벨까지 알림 보냈는지 확인
+        key = f"{today}_{code}"
+        last_level = last_alerts.get(key, 0)
+        
+        # 새로운 레벨에 도달했을 때만 알림
+        # 예: 이전 레벨 1 (+3%대) → 현재 레벨 2 (+6%대) 진입 시 알림
+        #     이전 레벨 -1 (-3%대) → 현재 레벨 -2 (-6%대) 진입 시 알림
+        should_alert = False
+        if current_level > 0 and current_level > last_level:
+            should_alert = True
+        elif current_level < 0 and current_level < last_level:
+            should_alert = True
+        
+        if should_alert:
+            emoji = '🚀' if change > 0 else '📉'
+            threshold_text = f"{current_level * STEP:+.0f}% 돌파"
+            message = (
+                f"{emoji} <b>{name}</b> {threshold_text}\n"
+                f"등락률: {change:+.2f}%\n"
+                f"현재가: {price:,}원\n"
+                f"시각: {datetime.now().strftime('%H:%M')}"
+            )
+            if send_telegram(message):
+                last_alerts[key] = current_level
+                print(f"알림 전송 완료: {name} 레벨 {current_level}")
     
     # 7일 이전 기록은 삭제
     cutoff = datetime.now().strftime('%Y-%m-%d')

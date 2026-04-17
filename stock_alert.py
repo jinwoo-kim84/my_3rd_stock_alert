@@ -18,7 +18,7 @@ STOCKS = {
     '456160': '지투지바이오'
 }
 
-THRESHOLD = 3.0  # ±3% 변동 감지
+THRESHOLD = 0.1  # ±3% 변동 감지
 
 def get_stock_price(code):
     """네이버 금융에서 현재가 가져오기"""

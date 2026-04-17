@@ -100,11 +100,12 @@ def main():
         elif current_level < 0 and current_level < last_level:
             should_alert = True
         
-        if should_alert:
-            emoji = '🚀' if change > 0 else '📉'
+       if should_alert:
+            blocks = '🟥🟥🟥' if change > 0 else '🟦🟦🟦'
             threshold_text = f"{current_level * STEP:+.1f}% 돌파"
             message = (
-                f"{emoji} <b>{name}</b> {threshold_text}\n"
+                f"{blocks}\n"
+                f"<b>{name}</b> {threshold_text}\n"
                 f"등락률: {change:+.2f}%\n"
                 f"현재가: {price:,}원\n"
                 f"시각: {datetime.now().strftime('%H:%M')}"

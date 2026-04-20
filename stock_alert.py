@@ -20,6 +20,7 @@ STOCKS = {
 
 STEP = 3.0  # 테스트용 (원래 3.0)
 
+
 def get_stock_price(code):
     """네이버 금융에서 현재가 가져오기"""
     url = f"https://m.stock.naver.com/api/stock/{code}/basic"
@@ -34,6 +35,7 @@ def get_stock_price(code):
         print(f"가격 조회 실패 ({code}): {e}")
         return None, None
 
+
 def send_telegram(message):
     """텔레그램으로 메시지 전송"""
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
@@ -44,6 +46,7 @@ def send_telegram(message):
     except Exception as e:
         print(f"텔레그램 전송 실패: {e}")
         return False
+
 
 def load_last_alerts():
     """이전 알림 기록 불러오기"""
@@ -56,6 +59,7 @@ def load_last_alerts():
     except:
         return {}
 
+
 def save_last_alerts(alerts):
     """알림 기록 저장"""
     url = f"https://api.github.com/gists/{GIST_ID}"
@@ -66,6 +70,7 @@ def save_last_alerts(alerts):
     except Exception as e:
         print(f"기록 저장 실패: {e}")
 
+
 def get_level(change):
     """등락률을 STEP 단위 레벨로 변환"""
     if abs(change) < STEP:
@@ -75,32 +80,33 @@ def get_level(change):
     else:
         return -int(abs(change) // STEP)
 
+
 def main():
     print(f"=== 실행 시간: {datetime.now()} ===")
     last_alerts = load_last_alerts()
     today = datetime.now().strftime('%Y-%m-%d')
-    
+
     for code, name in STOCKS.items():
         price, change = get_stock_price(code)
         if price is None:
             continue
-        
+
         current_level = get_level(change)
         print(f"{name}: {price:,}원 ({change:+.2f}%, 레벨 {current_level})")
-        
+
         if current_level == 0:
             continue
-        
+
         key = f"{today}_{code}"
         last_level = last_alerts.get(key, 0)
-        
+
         should_alert = False
         if current_level > 0 and current_level > last_level:
             should_alert = True
         elif current_level < 0 and current_level < last_level:
             should_alert = True
-        
-       if should_alert:
+
+        if should_alert:
             blocks = '🟥🟥🟥' if change > 0 else '🟦🟦🟦'
             threshold_text = f"{current_level * STEP:+.1f}% 돌파"
             message = (
@@ -113,10 +119,11 @@ def main():
             if send_telegram(message):
                 last_alerts[key] = current_level
                 print(f"알림 전송 완료: {name} 레벨 {current_level}")
-    
+
     cutoff = datetime.now().strftime('%Y-%m-%d')
     last_alerts = {k: v for k, v in last_alerts.items() if k.split('_')[0] >= cutoff}
     save_last_alerts(last_alerts)
+
 
 if __name__ == '__main__':
     main()
